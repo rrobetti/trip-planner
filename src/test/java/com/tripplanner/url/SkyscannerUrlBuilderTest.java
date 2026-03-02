@@ -50,9 +50,10 @@ class SkyscannerUrlBuilderTest {
         flight.setOrigin("DUB");
         flight.setDestination("SAOA");
 
-        // July 26, 2026 => 260726
-        String url = builder.buildUrl(flight, LocalDate.of(2026, 7, 26), config);
-        assertTrue(url.contains("/260726/"), "Date should be formatted as DDMMYY: 260726");
+        // July 15, 2026 => yyMMdd = 260715
+        String url = builder.buildUrl(flight, LocalDate.of(2026, 7, 15), config);
+        assertTrue(url.contains("/260715/"), "Date should be formatted as yyMMdd: 260715");
+        assertFalse(url.contains("/150726/"), "Date must NOT use ddMMyy format");
     }
 
     @Test
@@ -116,6 +117,19 @@ class SkyscannerUrlBuilderTest {
         assertTrue(url.contains("fare-attributes="), "URL should contain fare-attributes");
         assertTrue(url.contains("checked-bag"), "URL should contain checked-bag");
         assertTrue(url.contains("cabin-bag"), "URL should contain cabin-bag");
+        assertTrue(url.contains("%2C"), "Multiple values must be separated by %2C (URL-encoded comma)");
+    }
+
+    @Test
+    void testStopsEncoding() {
+        FlightSearchConfig flight = new FlightSearchConfig();
+        flight.setOrigin("DUB");
+        flight.setDestination("SAOA");
+
+        String url = builder.buildUrl(flight, LocalDate.of(2026, 7, 26), config);
+        assertTrue(url.contains("stops="), "URL should contain stops param");
+        assertTrue(url.contains("%21direct"), "Stops should have URL-encoded !");
+        assertTrue(url.contains("%2C"), "Multiple stop values must be separated by %2C");
     }
 
     @Test

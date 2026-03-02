@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 public class SkyscannerUrlBuilder {
 
     private static final String BASE_URL = "https://www.skyscanner.ie/transport/flights/";
-    private static final DateTimeFormatter SKYSCANNER_DATE_FMT = DateTimeFormatter.ofPattern("ddMMyy");
+    private static final DateTimeFormatter SKYSCANNER_DATE_FMT = DateTimeFormatter.ofPattern("yyMMdd");
 
     public String buildUrl(FlightSearchConfig flightConfig, LocalDate date, TripPlannerConfig config) {
         PassengersConfig passengers = config.getPassengers();
@@ -60,14 +60,14 @@ public class SkyscannerUrlBuilder {
         if (!options.getStops().isEmpty()) {
             params.add("stops=" + options.getStops().stream()
                     .map(this::encode)
-                    .collect(Collectors.joining(",")));
+                    .collect(Collectors.joining("%2C")));
         }
 
         // Fare attributes
         if (!options.getFareAttributes().isEmpty()) {
             params.add("fare-attributes=" + options.getFareAttributes().stream()
                     .map(this::encode)
-                    .collect(Collectors.joining(",")));
+                    .collect(Collectors.joining("%2C")));
         }
 
         // Extra params

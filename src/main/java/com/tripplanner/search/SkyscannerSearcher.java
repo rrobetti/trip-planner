@@ -2,18 +2,31 @@ package com.tripplanner.search;
 
 import com.tripplanner.config.FlightSearchConfig;
 import com.tripplanner.config.TripPlannerConfig;
+import com.tripplanner.fetch.BrowserFetcher;
 import com.tripplanner.url.SkyscannerUrlBuilder;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SkyscannerSearcher {
+
+    // CSS selectors to wait for (signals the results are rendering)
+    private static final String[] WAIT_SELECTORS = {
+            "[data-testid='Price']",
+            "[class*='Price_mainPrice']",
+            "[class*='price']",
+            "body"
+    };
+
+    // CSS selectors from which to read the cheapest-price text
+    private static final String[] PRICE_SELECTORS = {
+            "[data-testid='Price']",
+            "[class*='Price_mainPrice']",
+            "[class*='BpkText'][class*='price']",
+            "span[class*='price']",
+            "div[class*='price']"
+    };
 
     private final SkyscannerUrlBuilder urlBuilder = new SkyscannerUrlBuilder();
     private final boolean fetchEnabled;
@@ -38,57 +51,42 @@ public class SkyscannerSearcher {
                 result.setDepartureDate(current);
                 result.setReturnFlight(flightConfig.isReturnFlight());
                 result.setUrl(url);
-
-                if (fetchEnabled) {
-                    fetchPrice(result, url);
-                }
-
                 results.add(result);
                 current = current.plusDays(1);
+            }
+        }
+
+        if (fetchEnabled) {
+            System.out.println("  Opening headless browser for Skyscanner...");
+            try (BrowserFetcher fetcher = new BrowserFetcher()) {
+                for (FlightResult result : results) {
+                    fetchPrice(fetcher, result);
+                }
+            } catch (Exception e) {
+                for (FlightResult result : results) {
+                    if (result.getError() == null) {
+                        result.setError("Browser init failed: " + e.getMessage());
+                    }
+                }
             }
         }
 
         return results;
     }
 
-    private void fetchPrice(FlightResult result, String url) {
+    private void fetchPrice(BrowserFetcher fetcher, FlightResult result) {
         try {
-            Document doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                    .header("Accept-Language", "en-US,en;q=0.9")
-                    .timeout(15000)
-                    .get();
-
-            // Skyscanner renders via JS; try several CSS selectors for price
-            String price = tryExtractPrice(doc,
-                    "[data-testid='price']",
-                    ".BpkText_bpk-text--lg__NWVhO",
-                    ".Price_mainPriceContainer__ZV9Pg",
-                    "span[class*='price']",
-                    "div[class*='price']");
-
+            String price = fetcher.fetchPrice(result.getUrl(), WAIT_SELECTORS, PRICE_SELECTORS);
             if (price != null) {
                 result.setPrice(price);
                 result.setFetched(true);
             } else {
-                result.setError("Price not found - the page may require JavaScript rendering. Try accessing the URL manually or use a headless browser.");
+                result.setError("Price not found - the page may require JavaScript rendering. "
+                        + "Try accessing the URL manually or use a headless browser.");
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             result.setError("Fetch failed: " + e.getMessage());
         }
     }
-
-    private String tryExtractPrice(Document doc, String... selectors) {
-        for (String selector : selectors) {
-            Elements elements = doc.select(selector);
-            if (!elements.isEmpty()) {
-                Element el = elements.first();
-                String text = el.text().trim();
-                if (!text.isEmpty() && (text.contains("€") || text.contains("$") || text.contains("£") || text.matches(".*\\d+.*"))) {
-                    return text;
-                }
-            }
-        }
-        return null;
-    }
 }
+

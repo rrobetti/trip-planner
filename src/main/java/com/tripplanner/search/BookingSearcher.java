@@ -2,18 +2,26 @@ package com.tripplanner.search;
 
 import com.tripplanner.config.HotelSearchConfig;
 import com.tripplanner.config.TripPlannerConfig;
+import com.tripplanner.fetch.BrowserFetcher;
 import com.tripplanner.url.BookingUrlBuilder;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 public class BookingSearcher {
+
+    // Selector that signals search results have loaded
+    private static final String CARD_SELECTOR = "[data-testid='property-card']";
+
+    // CSS selectors for price text within a card or on the page
+    private static final String[] PRICE_SELECTORS = {
+            "[data-testid='price-and-discounted-price']",
+            ".prco-valign-middle-helper",
+            "[data-testid='recommended-units-price']",
+            "span[class*='price']",
+            "strong[class*='price']"
+    };
 
     private final BookingUrlBuilder urlBuilder = new BookingUrlBuilder();
     private final boolean fetchEnabled;
@@ -38,83 +46,45 @@ public class BookingSearcher {
                 result.setCheckin(current);
                 result.setCheckout(current.plusDays(hotelConfig.getStayNights()));
                 result.setUrl(url);
-
-                if (fetchEnabled) {
-                    fetchPrice(result, url, hotelConfig.getHotelName());
-                }
-
                 results.add(result);
                 current = current.plusDays(1);
+            }
+        }
+
+        if (fetchEnabled) {
+            System.out.println("  Opening headless browser for Booking.com...");
+            try (BrowserFetcher fetcher = new BrowserFetcher()) {
+                for (HotelResult result : results) {
+                    fetchPrice(fetcher, result);
+                }
+            } catch (Exception e) {
+                for (HotelResult result : results) {
+                    if (result.getError() == null) {
+                        result.setError("Browser init failed: " + e.getMessage());
+                    }
+                }
             }
         }
 
         return results;
     }
 
-    private void fetchPrice(HotelResult result, String url, String hotelName) {
+    private void fetchPrice(BrowserFetcher fetcher, HotelResult result) {
         try {
-            Document doc = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                    .header("Accept-Language", "en-GB,en;q=0.9")
-                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-                    .timeout(15000)
-                    .get();
-
-            String price = null;
-
-            // If a specific hotel name was given, search for it in the results
-            if (hotelName != null && !hotelName.isEmpty()) {
-                price = findHotelPrice(doc, hotelName);
-            }
-
-            // Otherwise, try to get the cheapest price shown
-            if (price == null) {
-                price = tryExtractPrice(doc,
-                        "[data-testid='price-and-discounted-price']",
-                        ".prco-valign-middle-helper",
-                        "span[class*='price']",
-                        "[data-testid='recommended-units-price']",
-                        "strong[class*='price']");
-            }
-
+            String price = fetcher.fetchBookingPrice(
+                    result.getUrl(), result.getHotelName(), CARD_SELECTOR, PRICE_SELECTORS);
             if (price != null) {
                 result.setPrice(price);
                 result.setFetched(true);
             } else {
-                result.setError("Price not found in search results. The hotel may not be available for these dates, or the page structure may have changed.");
+                result.setError("Price not found in search results. "
+                        + "The hotel may not be available for these dates, "
+                        + "or the page structure may have changed.");
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             result.setError("Fetch failed: " + e.getMessage());
         }
     }
 
-    private String findHotelPrice(Document doc, String hotelName) {
-        // Try to find a property card matching the hotel name
-        String lowerName = hotelName.toLowerCase();
-        Elements propertyCards = doc.select("[data-testid='property-card'], .sr_property_block, div[class*='property']");
-        for (Element card : propertyCards) {
-            String cardText = card.text().toLowerCase();
-            if (cardText.contains(lowerName)) {
-                Elements priceEls = card.select("[data-testid='price-and-discounted-price'], span[class*='price'], strong[class*='price']");
-                if (!priceEls.isEmpty()) {
-                    return priceEls.first().text().trim();
-                }
-            }
-        }
-        return null;
-    }
-
-    private String tryExtractPrice(Document doc, String... selectors) {
-        for (String selector : selectors) {
-            Elements elements = doc.select(selector);
-            if (!elements.isEmpty()) {
-                Element el = elements.first();
-                String text = el.text().trim();
-                if (!text.isEmpty() && (text.contains("€") || text.contains("$") || text.contains("£") || text.matches(".*\\d+.*"))) {
-                    return text;
-                }
-            }
-        }
-        return null;
-    }
 }
+
