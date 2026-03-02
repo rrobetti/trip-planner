@@ -11,6 +11,8 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Fetches web pages using a headless Chrome browser so that JavaScript-rendered
@@ -32,6 +34,12 @@ public class BrowserFetcher implements AutoCloseable {
     private final WebDriver driver;
 
     public BrowserFetcher() {
+        // Suppress CDP version-mismatch warnings emitted when the installed Chrome
+        // version is newer than the devtools artifacts bundled with selenium-java.
+        // Our code uses only standard W3C WebDriver commands and does not require CDP.
+        Logger.getLogger("org.openqa.selenium.devtools.CdpVersionFinder").setLevel(Level.SEVERE);
+        Logger.getLogger("org.openqa.selenium.chromium.ChromiumDriver").setLevel(Level.SEVERE);
+
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--headless=new");
         options.addArguments("--no-sandbox");
