@@ -1,0 +1,37 @@
+{
+  "passengers": {
+    "adults": 2,
+    "childrenAges": [4, 6]
+  },
+  "flights": [
+    {
+      "origin": "DUB",
+      "destination": "SAOA",
+      "returnFlight": false,
+      "dateRangeStart": "2026-07-15",
+      "dateRangeEnd": "2026-07-20",
+      "maxDurationDays": 14
+    }
+  ],
+  "hotels": [
+    {
+      "location": "Cabo de Santo Agostinho",
+      "hotelName": "Suites Quatro Rodas",
+      "rooms": 1,
+      "stayNights": 7,
+      "checkinRangeStart": "2026-07-15",
+      "checkinRangeEnd": "2026-07-20"
+    }
+  ],
+  "flightOptions": {
+    "cabinClass": "economy",
+    "stops": ["!direct", "!twoPlusStops"],
+    "fareAttributes": ["checked-bag", "cabin-bag"],
+    "preferDirects": false,
+    "outboundAltsEnabled": false,
+    "inboundAltsEnabled": false,
+    "sortBy": "cheapest"
+  },
+  "extraFlightParams": {},
+  "extraHotelParams": {}
+}
