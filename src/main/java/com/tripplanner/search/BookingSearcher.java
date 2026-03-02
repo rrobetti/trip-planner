@@ -81,7 +81,7 @@ public class BookingSearcher {
                 result.setPrice(price);
                 result.setFetched(true);
             } else {
-                result.setError("Price not found in page");
+                result.setError("Price not found in search results. The hotel may not be available for these dates, or the page structure may have changed.");
             }
         } catch (IOException e) {
             result.setError("Fetch failed: " + e.getMessage());

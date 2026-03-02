@@ -71,7 +71,7 @@ public class SkyscannerSearcher {
                 result.setPrice(price);
                 result.setFetched(true);
             } else {
-                result.setError("Price not found in page (JS rendering may be required)");
+                result.setError("Price not found - the page may require JavaScript rendering. Try accessing the URL manually or use a headless browser.");
             }
         } catch (IOException e) {
             result.setError("Fetch failed: " + e.getMessage());
